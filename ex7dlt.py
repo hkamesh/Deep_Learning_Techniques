@@ -5,7 +5,6 @@ from tensorflow.keras.layers import Input, LSTM, Embedding, Dense, Concatenate, 
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
-# ===== Step 1: Data Preparation ===== #
 input_texts = [
     'hello', 'how are you', 'what is your name', 'bye', 'what can you do',
     'tell me a joke', 'thank you', 'good morning', 'good night'
@@ -16,34 +15,27 @@ target_texts = [
     'why did the chicken cross the road', 'you are welcome', 'morning', 'night'
 ]
 
-# Add start and end tokens
 target_texts = ['<start> ' + txt + ' <end>' for txt in target_texts]
 
-# Tokenize
 tokenizer = Tokenizer(filters='')
 tokenizer.fit_on_texts(input_texts + target_texts)
 input_sequences = tokenizer.texts_to_sequences(input_texts)
 target_sequences = tokenizer.texts_to_sequences(target_texts)
 
-# Pad sequences
 input_sequences = pad_sequences(input_sequences, padding='post')
 target_sequences = pad_sequences(target_sequences, padding='post')
 
-# Get metadata
 vocab_size = len(tokenizer.word_index) + 1
 max_input_len = input_sequences.shape[1]
 max_target_len = target_sequences.shape[1]
 
-# ===== Step 2: Model Definition ===== #
 embedding_dim = 64
 lstm_units = 128
 
-# Encoder
 encoder_inputs = Input(shape=(None,))
 enc_emb = Embedding(vocab_size, embedding_dim)(encoder_inputs)
 encoder_outputs, state_h, state_c = LSTM(lstm_units, return_sequences=True, return_state=True)(enc_emb)
 
-# Decoder
 decoder_inputs = Input(shape=(None,))
 dec_emb_layer = Embedding(vocab_size, embedding_dim)
 dec_emb = dec_emb_layer(decoder_inputs)
@@ -51,27 +43,20 @@ decoder_lstm_outputs, _, _ = LSTM(lstm_units, return_sequences=True, return_stat
     dec_emb, initial_state=[state_h, state_c]
 )
 
-# Attention
 attention = Attention()
 context_vector = attention([decoder_lstm_outputs, encoder_outputs])
 concat = Concatenate(axis=-1)([context_vector, decoder_lstm_outputs])
 decoder_outputs = Dense(vocab_size, activation='softmax')(concat)
 
-# Full model
 model = Model([encoder_inputs, decoder_inputs], decoder_outputs)
 model.compile(optimizer='adam', loss='sparse_categorical_crossentropy')
 
-# Target output reshaping
 decoder_target_data = np.expand_dims(target_sequences, -1)
 
-# Train
 model.fit([input_sequences, target_sequences], decoder_target_data, batch_size=2, epochs=300, verbose=0)
 
-# ===== Step 3: Inference Models ===== #
-# Encoder
 encoder_model = Model(encoder_inputs, [encoder_outputs, state_h, state_c])
 
-# Decoder setup
 dec_state_input_h = Input(shape=(lstm_units,))
 dec_state_input_c = Input(shape=(lstm_units,))
 enc_output_input = Input(shape=(max_input_len, lstm_units))
@@ -90,7 +75,6 @@ decoder_model = Model(
     [dec_outputs2, state_h2, state_c2]
 )
 
-# ===== Step 4: Response Generator with Anti-Repetition ===== #
 def generate_response(input_text, temperature=1.0):
     def sample_with_temperature(probabilities, temperature=1.0):
         probabilities = np.asarray(probabilities).astype('float64')
@@ -125,7 +109,6 @@ def generate_response(input_text, temperature=1.0):
 
     return decoded_sentence.strip()
 
-# ===== Step 5: Test Bot ===== #
 test_inputs = [
     "hello",
     "how are you",
